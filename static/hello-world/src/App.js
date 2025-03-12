@@ -105,6 +105,7 @@ const App = () => {
 
   return (
     <div className="container">
+        <div className={isModalOpen? 'blur': ''}></div>
         <div className='targets'>
         <h2>Targets</h2>
         <button onClick={openAddModal} className="btn-add">Add Target</button>
