@@ -1,0 +1,20 @@
+modules:
+  jira:projectPage:
+    - key: customui122-hello-world-project-page
+      resource: main
+      resolver:
+        function: resolver
+      title: customui122
+  function:
+    - key: resolver
+      handler: index.handler
+resources:
+  - key: main
+    path: static/hello-world/build
+permissions:
+  scopes:
+    - storage:app
+app:
+  runtime:
+    name: nodejs22.x
+  id: ari:cloud:ecosystem::app/ae907553-8017-4c6b-81f5-232903cb0f23
