@@ -17,6 +17,10 @@ resolver.define('saveAwsCredentials', async (req) => {
     secretsObject = {}; // Reset if parsing fails
   }
 
+  if(secretsObject[targetName]){
+    return { success: false, message: `Target ${targetName} already exists.` };
+  }
+
   secretsObject[targetName] = {
     accessKey,
     secretKey,

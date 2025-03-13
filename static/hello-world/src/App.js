@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { invoke } from '@forge/bridge';
 import './styles.css'; // Importing CSS
 
@@ -7,7 +7,7 @@ const App = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
   const [selectedCredential, setSelectedCredential] = useState(null);
-  const [activeCredentialId, setActiveCredentialId] = useState(null);
+  const [alreadyExist, setAlreadyExist] = useState('');
   const [formData, setFormData] = useState({
     provider: '',
     targetName: '',
@@ -16,6 +16,10 @@ const App = () => {
     roleArn: ''
   });
   const [errors, setErrors] = useState({});
+  
+  const [delConfirmation, setDelConfirmation] = useState(false);
+  const [deleteInput, setDeleteInput] = useState('');
+  const [deleteError, setDeleteError] = useState('');
 
   const fetchAwsCredentials = async () => {
     try {
@@ -53,7 +57,11 @@ const App = () => {
       if (isEditMode) {
         await invoke('editAwsCredentials', { targetName: selectedCredential.targetName, updatedFields: formData });
       } else {
-        await invoke('saveAwsCredentials', formData);
+        const response = await invoke('saveAwsCredentials', formData);
+        if (!response.success) {
+          setAlreadyExist(response.message);
+          return;
+        }
       }
       fetchAwsCredentials();
       closeModal();
@@ -62,16 +70,15 @@ const App = () => {
     }
   };
 
-  const deleteCredential = async (targetName) => {
-    if (window.confirm(`Are you sure you want to delete "${targetName}"?`)) {
-      try {
-        await invoke('deleteAwsCredentials', { targetName });
-        fetchAwsCredentials();
-        closeModal();
-        setActiveCredentialId(null);
-      } catch (error) {
-        console.error('Error deleting credential:', error);
-      }
+  const handleDelete = async () => {
+    if (deleteInput === selectedCredential?.targetName) {
+      await invoke('deleteAwsCredentials', { targetName: selectedCredential.targetName });
+      fetchAwsCredentials();
+      setDelConfirmation(false);
+      setDeleteInput('');
+      closeModal();
+    } else {
+      setDeleteError('Target name does not match.');
     }
   };
 
@@ -88,7 +95,9 @@ const App = () => {
     setErrors({});
     setIsEditMode(true);
     setIsModalOpen(true);
-    setActiveCredentialId(null);
+    setDelConfirmation(false);
+    setDeleteInput('');
+    setDeleteError('');
   };
 
   const closeModal = () => {
@@ -96,31 +105,19 @@ const App = () => {
     setSelectedCredential(null);
   };
 
-  const clearForm = () => {
-    setFormData({ provider: '', targetName: isEditMode ? selectedCredential.targetName : '', accessKey: '', secretKey: '', roleArn: '' });
-    setErrors({});
-  };
-
-  const toggleCredentialActions = (index) => setActiveCredentialId(activeCredentialId === index ? null : index);
-
   return (
     <div className="container">
-        <div className={isModalOpen? 'blur': ''}></div>
-        <div className='targets'>
+      <div className={isModalOpen ? 'blur' : ''}></div>
+      <div className='targets'>
         <h2>Targets</h2>
         <button onClick={openAddModal} className="btn-add">Add Target</button>
-        </div>
+      </div>
 
       {credentials.length > 0 ? (
         <div className="credentials-grid">
           {credentials.map((cred, index) => (
-            <div key={index} className={`credential-box ${activeCredentialId === index ? 'active' : ''}`} onClick={() => openEditModal(cred)}>
+            <div key={index} className="credential-box" onClick={() => openEditModal(cred)}>
               <h3>{cred.targetName}</h3>
-              {/* <div className="provider">{cred.provider}</div> */}
-              {/* <div className="credential-actions">
-                <button className="btn-edit" onClick={(e) => { e.stopPropagation(); openEditModal(cred); }}>Edit</button>
-                <button className="btn-delete" onClick={(e) => { e.stopPropagation(); deleteCredential(cred.targetName); }}>Delete</button>
-              </div> */}
             </div>
           ))}
         </div>
@@ -128,43 +125,69 @@ const App = () => {
         <div className="no-credentials"><p>No targets available. Click 'Add Target' to create one.</p></div>
       )}
 
-      {/* <button onClick={fetchAwsCredentials} className="btn-refresh">Refresh Credentials</button> */}
-
       {isModalOpen && (
-
         <div className="modal-overlay">
           <div className="modal-content">
-            <div className="modal-header"><h3>{isEditMode ? 'Edit AWS Account' : 'Add AWS Account'}</h3></div>
+            <div className="modal-header"><h3>{isEditMode ? 'Edit' : 'Add'} Target</h3></div>
             <form onSubmit={handleSubmit}>
               {['targetName', 'provider', 'accessKey', 'secretKey'].map((field) => (
                 <div key={field} className="form-group">
-                  <label>{field === 'targetName' ? 'Target Name' : field.replace(/([A-Z])/g, ' $1')}<span className="required">*</span></label>
+                  <label>
+                    {field === 'targetName' ? 'Target Name' : field.replace(/([A-Z])/g, ' $1')}
+                    <span className="required">*</span>
+                  </label>
                   <input
                     type="text"
                     name={field}
                     value={formData[field]}
                     onChange={handleChange}
-                    disabled={isEditMode && field === 'targetName'}
+                    disabled={((isEditMode && field) === 'targetName' ) || (delConfirmation)}
+          
                     className={`form-control ${errors[field] ? 'error' : ''}`}
                   />
                   {errors[field] && <div className="error-message">{`${field.replace(/([A-Z])/g, ' $1')} is required`}</div>}
+                  {field === 'targetName' && alreadyExist && <div className="error-message already-exist">{alreadyExist}</div>}
                 </div>
               ))}
+
               <div className="form-group">
                 <label>Role ARN</label>
-                <input type="text" name="roleArn" value={formData.roleArn} onChange={handleChange} className="form-control" />
+                <input type="text" disabled={delConfirmation} name="roleArn" value={formData.roleArn} onChange={handleChange} className="form-control" />
               </div>
+
               <div className="form-actions">
-                <div>
-                {isEditMode && (
-                  <button type="button" onClick={() => deleteCredential(selectedCredential.targetName)} className="btn-delete">Delete</button>
-                )}
+              {isEditMode && (
+                <div className="delete-section">
+                  {!delConfirmation ? (
+                    <button type="button" onClick={() => setDelConfirmation(true)} className="btn-delete">Delete</button>
+                  ) : (
+                    <div className="delete-confirmation">
+                      <label>Enter the target name to confirm delete:</label>
+                      <input 
+                        type="text" 
+                        value={deleteInput} 
+                        onChange={(e) => {
+                          setDeleteInput(e.target.value);
+                          setDeleteError('');
+                        }} 
+                        className="form-control"
+                      />
+                      {deleteError && <div className="error-message">{deleteError}</div>}
+                      <div>
+                        <button type="button" onClick={handleDelete} className="btn-confirm-delete">Confirm</button>
+                        <button type="button" onClick={() => setDelConfirmation(false)} className="btn-secondary">Cancel</button>
+                      </div>
+                    </div>
+                  )}
                 </div>
-                <div>             
-                <button type="submit" className="btn-primary">Save</button>
-                <button type="button" onClick={clearForm} className="btn-clear">Clear</button>
-                
-                <button type="button" onClick={closeModal} className="btn-secondary">Cancel</button></div>
+              )}
+
+              {!delConfirmation && (
+                <div style={{ display: "flex", gap: "5px", flexDirection: "row" }}>
+                  <button type="submit" className="btn-primary">Save</button>
+                  <button type="button" onClick={closeModal} className="btn-secondary">Cancel</button>
+                </div>
+              )}
               </div>
             </form>
           </div>
