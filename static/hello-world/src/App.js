@@ -1,39 +1,59 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { invoke } from '@forge/bridge';
+import React, { useState, useEffect } from 'react';
+import { invoke,view } from '@forge/bridge';
 import './styles.css'; // Importing CSS
+import Filter from './filter';
 
 const App = () => {
+  const [projectId, setProjectId] = useState('');
   const [credentials, setCredentials] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
   const [selectedCredential, setSelectedCredential] = useState(null);
   const [alreadyExist, setAlreadyExist] = useState('');
   const [formData, setFormData] = useState({
-    provider: '',
+    cururl: '', 
     targetName: '',
     accessKey: '',
     secretKey: '',
-    roleArn: ''
+    region: '',
+    output: ''
   });
   const [errors, setErrors] = useState({});
+
+  useEffect(() => {
+    view.getContext().then((context) => {
+      const id = context.extension.project.id;
+      setProjectId(id);
+      fetchAwsCredentials(id);
+    });
+  }, []);
+
+  const fieldLabels = {
+    targetName: 'Account Name',
+    accessKey: 'Access Key',
+    secretKey: 'Secret Key',
+    cururl: 'CUR S3 bucket URI',
+    region : 'Region',
+    output: 'Output S3 bucket URI'
+  };
+  
   
   const [delConfirmation, setDelConfirmation] = useState(false);
   const [deleteInput, setDeleteInput] = useState('');
   const [deleteError, setDeleteError] = useState('');
 
-  const fetchAwsCredentials = async () => {
+  const fetchAwsCredentials = async (id) => {
+    if (!id) return;
     try {
-      const result = await invoke('getAwsCredentials');
-      setCredentials(result && typeof result === 'object' && Object.keys(result).length > 0 ? Object.values(result) : []);
+      const result = await invoke('getAwsCredentials', { projectId: id });
+      console.log("result"  , result);
+      setCredentials(Object.values(result || {}));
     } catch (error) {
       console.error('Error fetching credentials:', error);
-      setCredentials([]);
+      setCredentials([]); // Optional: Clear credentials on failure
     }
   };
-
-  useEffect(() => {
-    fetchAwsCredentials();
-  }, []);
+  
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -43,9 +63,10 @@ const App = () => {
 
   const validateForm = () => {
     const newErrors = {};
-    ['targetName', 'provider', 'accessKey', 'secretKey'].forEach((field) => {
+    ['targetName', 'accessKey', 'secretKey','cururl','region','output'].forEach((field) => {
       if (!formData[field]) newErrors[field] = true;
     });
+    
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -54,16 +75,18 @@ const App = () => {
     e.preventDefault();
     if (!validateForm()) return;
     try {
-      if (isEditMode) {
-        await invoke('editAwsCredentials', { targetName: selectedCredential.targetName, updatedFields: formData });
+      if (isEditMode && selectedCredential) {
+        await invoke('editAwsCredentials', { projectId,targetName: selectedCredential.targetName, updatedFields: formData });
       } else {
-        const response = await invoke('saveAwsCredentials', formData);
+        console.log(formData)
+        const response = await invoke('saveAwsCredentials', { projectId, ...formData });
         if (!response.success) {
           setAlreadyExist(response.message);
           return;
         }
       }
-      fetchAwsCredentials();
+
+      fetchAwsCredentials(projectId);
       closeModal();
     } catch (error) {
       console.error('Error saving credential:', error);
@@ -72,8 +95,9 @@ const App = () => {
 
   const handleDelete = async () => {
     if (deleteInput === selectedCredential?.targetName) {
-      await invoke('deleteAwsCredentials', { targetName: selectedCredential.targetName });
-      fetchAwsCredentials();
+      await invoke('deleteAwsCredentials', {  projectId,targetName: selectedCredential.targetName });
+      fetchAwsCredentials(projectId);
+      
       setDelConfirmation(false);
       setDeleteInput('');
       closeModal();
@@ -83,14 +107,16 @@ const App = () => {
   };
 
   const openAddModal = () => {
-    setFormData({ provider: '', targetName: '', accessKey: '', secretKey: '', roleArn: '' });
+    setFormData({targetName  : '', accessKey: '', secretKey: '',
+      cururl: '' ,region :'', output: ''});
     setErrors({});
     setIsEditMode(false);
     setIsModalOpen(true);
+    setAlreadyExist('');
   };
 
   const openEditModal = (cred) => {
-    setFormData(cred);
+    setFormData({...cred});
     setSelectedCredential(cred);
     setErrors({});
     setIsEditMode(true);
@@ -98,6 +124,7 @@ const App = () => {
     setDelConfirmation(false);
     setDeleteInput('');
     setDeleteError('');
+    setAlreadyExist('');
   };
 
   const closeModal = () => {
@@ -109,8 +136,8 @@ const App = () => {
     <div className="container">
       <div className={isModalOpen ? 'blur' : ''}></div>
       <div className='targets'>
-        <h2>Targets</h2>
-        <button onClick={openAddModal} className="btn-add">Add Target</button>
+        <h2>Accounts</h2>
+        <button onClick={openAddModal} className="btn-add">Add</button>
       </div>
 
       {credentials.length > 0 ? (
@@ -128,32 +155,31 @@ const App = () => {
       {isModalOpen && (
         <div className="modal-overlay">
           <div className="modal-content">
-            <div className="modal-header"><h3>{isEditMode ? 'Edit' : 'Add'} Target</h3></div>
+            <div className="modal-header"><h3>{isEditMode ? 'Edit' : 'Add'} Account</h3></div>
             <form onSubmit={handleSubmit}>
-              {['targetName', 'provider', 'accessKey', 'secretKey'].map((field) => (
+              <div className="form-element">
+              {['targetName','region','accessKey', 'secretKey','cururl','output'].map((field) => (
                 <div key={field} className="form-group">
                   <label>
-                    {field === 'targetName' ? 'Target Name' : field.replace(/([A-Z])/g, ' $1')}
-                    <span className="required">*</span>
+                  {fieldLabels[field]} {['targetName','accessKey', 'secretKey','cururl','region','output'].includes(field) && <span className="required">*</span>}
                   </label>
                   <input
                     type="text"
                     name={field}
                     value={formData[field]}
                     onChange={handleChange}
-                    disabled={((isEditMode && field) === 'targetName' ) || (delConfirmation)}
-          
+                    disabled={((isEditMode && field) === 'targetName' ) || (delConfirmation)}     
                     className={`form-control ${errors[field] ? 'error' : ''}`}
                   />
                   {errors[field] && <div className="error-message">{`${field.replace(/([A-Z])/g, ' $1')} is required`}</div>}
                   {field === 'targetName' && alreadyExist && <div className="error-message already-exist">{alreadyExist}</div>}
                 </div>
-              ))}
+              ))}      
+            </div>
+            <div className="example-url">
+                (e.g., https://mycurreportd0130.s3.us-east-1.amazonaws.com/d0130/cur/data/BILLING_PERIOD%3D2025-01/cur-00001.csv.gz)
+            </div>
 
-              <div className="form-group">
-                <label>Role ARN</label>
-                <input type="text" disabled={delConfirmation} name="roleArn" value={formData.roleArn} onChange={handleChange} className="form-control" />
-              </div>
 
               <div className="form-actions">
               {isEditMode && (
@@ -189,11 +215,13 @@ const App = () => {
                 </div>
               )}
               </div>
+              
             </form>
           </div>
         </div>
-      )}
+      )}<Filter accounts={credentials || []} />
     </div>
+    
   );
 };
 

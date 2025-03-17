@@ -2,119 +2,115 @@ import Resolver from '@forge/resolver';
 import { storage } from '@forge/api';
 
 const resolver = new Resolver();
-const storageKey = "secretsObject";
 
-// Function to save credentials
+const storageKey = 'secretsObject'; // Global storage but grouped by project ID inside
+
+// ----------- SAVE AWS CREDENTIALS -----------
 resolver.define('saveAwsCredentials', async (req) => {
-  const { projectId, provider, targetName, accessKey, secretKey, roleArn } = req.payload;
+  const { projectId,targetName, accessKey, secretKey, cururl, region,output } = req.payload;
+  console.log(`Received credentials for: ${targetName} in project: ${projectId}`);
 
   let secretsObject;
   try {
     const storedSecrets = await storage.getSecret(storageKey);
-    secretsObject = storedSecrets ? JSON.parse(storedSecrets) : {};  // Ensure it's an object
+    secretsObject = storedSecrets ? JSON.parse(storedSecrets) : {};
   } catch (error) {
     console.error('Error parsing stored secrets:', error);
-    secretsObject = {}; // Reset if parsing fails
+    secretsObject = {};
   }
 
-  if(secretsObject[targetName]){
-    return { success: false, message: `Target ${targetName} already exists.` };
+  if (!secretsObject[projectId]) {
+    secretsObject[projectId] = {}; // Initialize if not present
   }
 
-  secretsObject[targetName] = {
+  if (secretsObject[projectId][targetName]) {
+    return { success: false, message: `Target ${targetName} already exists in this project.` };
+  }
+
+  secretsObject[projectId][targetName] = {
     accessKey,
     secretKey,
-    roleArn,
-    provider,
+    cururl,
+    output,
+    region,
     targetName,
     projectId
   };
 
   try {
     await storage.setSecret(storageKey, JSON.stringify(secretsObject));
-    console.log(`Credentials stored successfully under target: ${targetName}`);
-    return { success: true, message: 'Credentials stored securely.' };
+    console.log(`Stored under target: ${targetName} for project: ${projectId}`);
+    return { success: true, message: 'Credentials stored securely for this project.' };
   } catch (error) {
     console.error('Error storing credentials:', error);
     return { success: false, message: 'Failed to store credentials.', error: error.message };
   }
 });
 
-// Function to retrieve all AWS credentials
-resolver.define('getAwsCredentials', async () => {
-  let secretsObject = await storage.getSecret(storageKey);
-  return secretsObject ? JSON.parse(secretsObject) : {}; // Return empty object if nothing stored
+// ----------- GET AWS CREDENTIALS -----------
+resolver.define('getAwsCredentials', async (req) => {
+  const { projectId } = req.payload;
+  try {
+    let secretsObject = await storage.getSecret(storageKey);
+    secretsObject = secretsObject ? JSON.parse(secretsObject) : {};
+    return secretsObject[projectId] || {}; // Return only for current project
+  } catch (error) {
+    console.error('Error retrieving credentials:', error);
+    return { success: false, message: 'Failed to retrieve credentials.', error: error.message };
+  }
 });
 
-
-
-// Function to edit specific fields of existing credentials
+// ----------- EDIT AWS CREDENTIALS -----------
 resolver.define('editAwsCredentials', async (req) => {
-  console.log('Received payload:', req.payload);
-  const { targetName, updatedFields } = req.payload;
-
-  console.log(`Editing credentials for: ${targetName}, updatedFields:`, updatedFields);
+  const { projectId, targetName, updatedFields } = req.payload;
 
   try {
     let secretsObject = await storage.getSecret(storageKey);
     secretsObject = secretsObject ? JSON.parse(secretsObject) : {};
 
-    console.log('Retrieved secretsObject:', secretsObject);
-
-    if (!secretsObject[targetName]) {
-      console.log(`Target ${targetName} not found.`);
-      return { success: false, message: `Target ${targetName} not found.` };
+    if (!secretsObject[projectId] || !secretsObject[projectId][targetName]) {
+      return { success: false, message: `Target ${targetName} not found in this project.` };
     }
 
-    secretsObject[targetName] = {
-      ...secretsObject[targetName],
-      ...updatedFields,
+    secretsObject[projectId][targetName] = {
+      ...secretsObject[projectId][targetName],
+      ...updatedFields
     };
 
-    console.log('Updated secretsObject:', secretsObject);
-
     await storage.setSecret(storageKey, JSON.stringify(secretsObject));
-    console.log(`Updated credentials for: ${targetName}`);
+    console.log(`Updated target: ${targetName} in project: ${projectId}`);
     return { success: true, message: `Updated credentials for ${targetName}.` };
   } catch (error) {
     console.error('Error updating credentials:', error);
-    console.error('Full error object:', error);
     return { success: false, message: 'Failed to update credentials.', error: error.message };
   }
 });
 
-// Function to delete credentials
+// ----------- DELETE AWS CREDENTIALS -----------
 resolver.define('deleteAwsCredentials', async (req) => {
-  const { targetName } = req.payload;
+  const { projectId, targetName } = req.payload;
 
   try {
-    let storedSecrets = await storage.getSecret(storageKey);
-    let secretsObject = storedSecrets ? JSON.parse(storedSecrets) : {};
+    let secretsObject = await storage.getSecret(storageKey);
+    secretsObject = secretsObject ? JSON.parse(secretsObject) : {};
 
-    if (!secretsObject[targetName]) {
-      return { success: false, message: `Target ${targetName} not found.` };
+    if (!secretsObject[projectId] || !secretsObject[projectId][targetName]) {
+      return { success: false, message: `Target ${targetName} not found in this project.` };
     }
 
-    // Delete the target
-    delete secretsObject[targetName]; 
+    delete secretsObject[projectId][targetName];
 
-    if (Object.keys(secretsObject).length === 0) {
-      // If no targets left, remove storage key entirely
-      await storage.deleteSecret(storageKey);
-      console.log(`Deleted last target: ${targetName}, storage cleared.`);
-    } else {
-      // If other targets still exist, update storage
-      await storage.setSecret(storageKey, JSON.stringify(secretsObject));
-      console.log(`Deleted target: ${targetName}`);
+    if (Object.keys(secretsObject[projectId]).length === 0) {
+      delete secretsObject[projectId]; // Clean up empty project entry
     }
 
+    await storage.setSecret(storageKey, JSON.stringify(secretsObject));
+    console.log(`Deleted target: ${targetName} in project: ${projectId}`);
     return { success: true, message: `Deleted credentials for ${targetName}.` };
   } catch (error) {
     console.error('Error deleting credentials:', error);
     return { success: false, message: 'Failed to delete credentials.', error: error.message };
   }
 });
-
-
 
 export const handler = resolver.getDefinitions();
