@@ -3,6 +3,7 @@ import AWS from "aws-sdk";
 
 const Filter = ({ accounts }) => {
   const [selectedAccount, setSelectedAccount] = useState(null); // Holds the selected account
+  const [queryResults, setQueryResults] = useState(null); // State to store query results
 
   const handleSelectChange = (e) => {
     const selectedName = e.target.value;
@@ -33,7 +34,7 @@ const Filter = ({ accounts }) => {
     const outputLocation = selectedAccount.output; // Athena query results location
 
     console.log("Table Name:", tableName);
-    console.log("Input location",selectedAccount.cururl);
+    console.log("Input location", selectedAccount.cururl);
     console.log("S3 Bucket:", s3Bucket);
     console.log("S3 Base Path:", s3BasePath);
     console.log("Partitioned Path:", partitionedPath);
@@ -41,30 +42,106 @@ const Filter = ({ accounts }) => {
 
     const executeAthenaQuery = async (query) => {
       try {
-        console.log("Executing query:", query); // ✅ Log the query before running
-        const response = await athena.startQueryExecution({
-          QueryString: query,
-          ResultConfiguration: { OutputLocation: outputLocation }
-        }).promise().then(response => {console.log("Query execution started:", response);return response;})
-         // ✅ Log response
-        
+        console.log("Executing query:", query); // Log the query before running
+        const startResponse = await athena
+          .startQueryExecution({
+            QueryString: query,
+            ResultConfiguration: { OutputLocation: outputLocation },
+          })
+          .promise();
+
+        console.log("Query execution started:", startResponse);
+        return startResponse;
       } catch (error) {
-        console.error("Athena query failed:", error); // ✅ Log Athena error
+        console.error("Athena query failed:", error); // Log Athena error
         throw error; // Ensure error propagates
       }
     };
-    
+
+    // New function to get query results
+    const getQueryResults = async (queryExecutionId) => {
+      try {
+        // Wait for query to complete
+        let queryStatus = "RUNNING";
+        while (queryStatus === "RUNNING" || queryStatus === "QUEUED") {
+          const statusResponse = await athena
+            .getQueryExecution({
+              QueryExecutionId: queryExecutionId,
+            })
+            .promise();
+
+          queryStatus = statusResponse.QueryExecution.Status.State;
+          console.log(`Query status: ${queryStatus}`);
+
+          if (queryStatus === "FAILED" || queryStatus === "CANCELLED") {
+            throw new Error(
+              `Query execution failed: ${statusResponse.QueryExecution.Status.StateChangeReason}`
+            );
+          }
+
+          if (queryStatus === "RUNNING" || queryStatus === "QUEUED") {
+            // Wait for 1 second before checking again
+            await new Promise((resolve) => setTimeout(resolve, 1000));
+          }
+        }
+
+        // Query completed successfully, get the results
+        const resultsResponse = await athena
+          .getQueryResults({
+            QueryExecutionId: queryExecutionId,
+          })
+          .promise();
+
+        console.log("Raw query results:", resultsResponse);
+
+        // Process the results into a more usable format
+        const headers = resultsResponse.ResultSet.Rows[0].Data.map(
+          (header) => header.VarCharValue
+        );
+
+        const rows = resultsResponse.ResultSet.Rows.slice(1).map((row) => {
+          const rowData = {};
+          row.Data.forEach((data, index) => {
+            rowData[headers[index]] = data.VarCharValue;
+          });
+          return rowData;
+        });
+
+        console.log("Processed row data:", rows);
+        setQueryResults(rows);
+        return rows;
+      } catch (error) {
+        console.error("Error getting query results:", error);
+        throw error;
+      }
+    };
 
     const setupAthenaTable = async () => {
       try {
         console.log("Setting up Athena table...");
+        console.log(
+          "WARNING: Checking IAM permissions - user needs s3:GetObject, s3:ListBucket permissions on the S3 bucket"
+        );
+
         // Step 1: Check if the database exists
-        await executeAthenaQuery(`SHOW DATABASES LIKE '${databaseName}';`);
-        console.log("Database exists");
+        try {
+          await executeAthenaQuery(`SHOW DATABASES LIKE '${databaseName}';`);
+          console.log("Database exists");
+        } catch (error) {
+          console.error("Error checking database - permission issue:", error);
+          throw new Error(`Permission issue: ${error.message}`);
+        }
 
         // Step 2: Create Database if it does not exist
-        await executeAthenaQuery(`CREATE DATABASE IF NOT EXISTS ${databaseName};`);
-        console.log("Database created");
+        try {
+          await executeAthenaQuery(
+            `CREATE DATABASE IF NOT EXISTS ${databaseName};`
+          );
+          console.log("Database created");
+        } catch (error) {
+          console.error("Error creating database - permission issue:", error);
+          throw new Error(`Permission issue: ${error.message}`);
+        }
 
         // Step 3: Create Table with Partitioning
         const createTableQuery = `
@@ -200,13 +277,31 @@ const Filter = ({ accounts }) => {
         STORED AS TEXTFILE 
         LOCATION '${selectedAccount.cururl}';
         `;
-        
-        await executeAthenaQuery(createTableQuery);
-        console.log("Table created");
+
+        try {
+          await executeAthenaQuery(createTableQuery);
+          console.log("Table created");
+        } catch (error) {
+          console.error("Error creating table - permission issue:", error);
+          throw new Error(`Permission issue: ${error.message}`);
+        }
 
         // Step 4: Load new partitions
-        await executeAthenaQuery(`MSCK REPAIR TABLE ${databaseName}.${tableName};`);
-        console.log("Partitions loaded");
+        try {
+          await executeAthenaQuery(
+            `MSCK REPAIR TABLE ${databaseName}.${tableName};`
+          );
+          console.log("Partitions loaded");
+        } catch (error) {
+          console.error(
+            "Error loading partitions - likely S3 permission issue:",
+            error
+          );
+          console.log(
+            "ERROR: User needs s3:GetObject permission on the S3 bucket paths"
+          );
+          throw new Error(`S3 permission issue: ${error.message}`);
+        }
 
         // Step 5: Query some data from the table to verify
         const fetchDataQuery = `SELECT
@@ -222,12 +317,33 @@ const Filter = ({ accounts }) => {
         line_item_usage_end_date as endDate,
         line_item_usage_amount as usageAmount
           FROM ${databaseName}.${tableName} LIMIT 10;`;
-        const fetchDataExecution = await executeAthenaQuery(fetchDataQuery);
-        console.log("Data fetched");
 
-        console.log("Athena Query Execution ID:", fetchDataExecution.QueryExecutionId);
+        const fetchDataExecution = await executeAthenaQuery(fetchDataQuery);
+        console.log(
+          "Data fetch initiated, execution ID:",
+          fetchDataExecution.QueryExecutionId
+        );
+
+        // Get and log the query results
+        const results = await getQueryResults(
+          fetchDataExecution.QueryExecutionId
+        );
+        console.log("Fetched data from Athena:", results);
       } catch (error) {
         console.error("Error in Athena operations:", error);
+
+        // Display error in UI
+        setQueryResults([
+          {
+            error: "true",
+            message: `AWS Permission Error: ${error.message}`,
+            solution: "The IAM user needs the following permissions:",
+            s3Permissions:
+              "s3:GetObject, s3:ListBucket on the S3 bucket containing the CUR data",
+            athenaPermissions:
+              "athena:StartQueryExecution, athena:GetQueryExecution, athena:GetQueryResults",
+          },
+        ]);
       }
     };
 
@@ -241,7 +357,9 @@ const Filter = ({ accounts }) => {
         <>
           <label>Select an Account: </label>
           <select onChange={handleSelectChange} defaultValue="">
-            <option value="" disabled>Select an account</option>
+            <option value="" disabled>
+              Select an account
+            </option>
             {accounts.map((acc, index) => (
               <option key={index} value={acc.targetName}>
                 {acc.targetName}
@@ -261,12 +379,111 @@ const Filter = ({ accounts }) => {
               }}
             >
               <h3>Account Details</h3>
-              <p><strong>Target Name:</strong> {selectedAccount.targetName}</p>
-              <p><strong>Region:</strong> {selectedAccount.region}</p>
-              <p><strong>Access Key:</strong> {selectedAccount.accessKey}</p>
-              <p><strong>Secret Key:</strong> {selectedAccount.secretKey}</p>
-              <p><strong>CUR URL:</strong> {selectedAccount.cururl}</p>
-              <p><strong>Output S3 URI:</strong> {selectedAccount.output}</p>
+              <p>
+                <strong>Target Name:</strong> {selectedAccount.targetName}
+              </p>
+              <p>
+                <strong>Region:</strong> {selectedAccount.region}
+              </p>
+              <p>
+                <strong>Access Key:</strong> {selectedAccount.accessKey}
+              </p>
+              <p>
+                <strong>Secret Key:</strong> {selectedAccount.secretKey}
+              </p>
+              <p>
+                <strong>CUR URL:</strong> {selectedAccount.cururl}
+              </p>
+              <p>
+                <strong>Output S3 URI:</strong> {selectedAccount.output}
+              </p>
+            </div>
+          )}
+
+          {/* Display query results or errors if available */}
+          {queryResults && queryResults.length > 0 && (
+            <div
+              className="query-results"
+              style={{
+                marginTop: "15px",
+                padding: "10px",
+                border: "1px solid #ccc",
+                borderRadius: "8px",
+                maxHeight: "400px",
+                overflowY: "auto",
+              }}
+            >
+              {queryResults[0].error ? (
+                <div
+                  style={{
+                    backgroundColor: "#ffebee",
+                    padding: "15px",
+                    borderRadius: "4px",
+                  }}
+                >
+                  <h3 style={{ color: "#d32f2f" }}>Error</h3>
+                  <p>
+                    <strong>{queryResults[0].message}</strong>
+                  </p>
+                  <p>{queryResults[0].solution}</p>
+                  <ul>
+                    <li>{queryResults[0].s3Permissions}</li>
+                    <li>{queryResults[0].athenaPermissions}</li>
+                  </ul>
+                  <h4>Troubleshooting Steps:</h4>
+                  <ol>
+                    <li>
+                      Check that the IAM user has the required permissions on
+                      the S3 bucket
+                    </li>
+                    <li>Verify that the S3 bucket policy allows access</li>
+                    <li>Confirm the S3 bucket and path are correct</li>
+                    <li>
+                      Check that the Athena service role has access to the S3
+                      bucket
+                    </li>
+                  </ol>
+                </div>
+              ) : (
+                <>
+                  <h3>Query Results</h3>
+                  <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                    <thead>
+                      <tr>
+                        {Object.keys(queryResults[0]).map((header, index) => (
+                          <th
+                            key={index}
+                            style={{
+                              border: "1px solid #ddd",
+                              padding: "8px",
+                              textAlign: "left",
+                            }}
+                          >
+                            {header}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {queryResults.map((row, rowIndex) => (
+                        <tr key={rowIndex}>
+                          {Object.values(row).map((value, cellIndex) => (
+                            <td
+                              key={cellIndex}
+                              style={{
+                                border: "1px solid #ddd",
+                                padding: "8px",
+                              }}
+                            >
+                              {value}
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </>
+              )}
             </div>
           )}
         </>
