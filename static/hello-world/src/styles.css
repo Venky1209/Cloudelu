@@ -1,0 +1,389 @@
+/* Main container styles */
+.container {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+  color: #172B4D;
+  max-width: 1200px;
+  margin: 0px;
+}
+
+.blur {
+  background-color: rgba(111, 106, 106, 0.475);
+  position: absolute;
+  top: 0pv;
+  left: 0px;
+  height: 98vh;
+  width: 100%;
+  z-index: 1;
+}
+
+.targets {
+  display: flex;
+  flex-direction: row;
+  width: 100%;
+  justify-content: space-between;
+  align-items: center;
+}
+
+h2 {
+  font-size: 24px;
+  font-weight: 500;
+  margin-bottom: 20px;
+  color: #172B4D;
+}
+
+.already-exist {
+  color: red;
+  width: 100%;
+
+}
+/* Button styles - Jira universal styling */
+button {
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  padding: 8px 12px;
+  transition: background-color 0.2s, color 0.2s;
+  border: none;
+  margin-right: 8px;
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.1);
+  width: 80px;
+  height: 30px;
+}
+
+button:hover {
+  opacity: 0.9;
+}
+
+button:active {
+  transform: translateY(1px);
+}
+
+/* Action button variations */
+.btn-primary {
+  background-color: #0052CC;
+  color: white;
+}
+
+.targets .btn-add {
+  background-color: #0052CC;
+  width: 100px;
+  color: white;
+}
+
+
+.delete-confirmation{
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  visibility: visible;
+}
+
+.delete-confirmation-hidden {
+  visibility: hidden;
+}
+
+.btn-delete{
+  background-color: whitesmoke;
+  color: red;
+  border: 1px solid red;
+}
+
+.delete-confirmation {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  gap: 10px;
+}
+
+.delete-confirmation label{
+  display: block;
+  margin-bottom: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #172B4D;
+}
+
+.btn-confirm-delete {
+  background-color: whitesmoke;
+  color: red;
+  border: 1px solid red;
+}
+
+.btn-edit {
+  background-color: #0052CC;
+  color: white;
+}
+
+
+.btn-secondary {
+  background-color: #F4F5F7;
+  color: #344563;
+  border: 1px solid #DFE1E6;
+}
+
+.btn-clear {
+  background-color: white;
+  color: #42526E;
+  border: 1px solid #DFE1E6;
+}
+
+/* Refresh button */
+.btn-refresh {
+  margin-top: 16px;
+  background-color: #F4F5F7;
+  color: #344563;
+  border: 1px solid #DFE1E6;
+}
+
+/* Credentials grid */
+.credentials-grid {
+  display: flex;
+  width: 98%;
+  flex-flow: row wrap;
+  gap: 16px;
+  background-color: #F4F5F7;
+  padding: 10px;
+}
+
+.credential-box {
+  border: 1px solid #DFE1E6;
+  border-radius: 3px;
+  width: 70px;
+  height: 30px;
+  padding: 16px;
+  background-color: white;
+  box-shadow: 0 1px 1px rgba(9, 30, 66, 0.25);
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.credential-box:hover {
+  box-shadow: 0 4px 8px rgba(9, 30, 66, 0.25);
+  transform: translateY(-2px);
+}
+
+.credential-box h3 {
+  font-size: 16px;
+  width: 90%;
+  height: 20px;
+  overflow: hidden;
+  margin: 0 0 4px 0;
+  color: #172B4D;
+  word-break: break-word;
+  text-align: center;
+}
+
+/* .credential-box .provider {
+  color: #5E6C84;
+  font-size: 14px;
+  margin-bottom: auto;
+}
+ */
+.credential-actions {
+  display: none;
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(255, 255, 255, 0.95);
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+  padding: 16px;
+}
+
+.credential-box.active .credential-actions {
+  display: flex;
+}
+
+.no-credentials {
+  padding: 16px;
+  background-color: #F4F5F7;
+  border-radius: 3px;
+  color: #5E6C84;
+  text-align: center;
+  margin-top: 20px;
+}
+
+/* Modal styles */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: transparent;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.modal-content {
+  border-radius: 10px;
+  background-color: white;
+  z-index: 400;
+  padding: 20px;
+
+  border-radius: 3px;
+  max-height: 75vh;
+  width: 478px;
+
+  overflow-y: auto;
+  box-shadow: 0 8px 16px rgba(9, 30, 66, 0.25), 0 0 1px rgba(9, 30, 66, 0.31);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+
+}
+
+
+.modal-header {
+  margin-bottom: 24px;
+  display: flex;
+  text-align: center;
+  justify-content: center;
+  flex-direction: column;
+}
+
+.modal-header h3 {
+  font-size: 20px;
+  font-weight: 500;
+  margin: 0;
+  color: #172B4D;
+  text-align: center;
+}
+
+
+/* Form styles */
+form{
+  display: flex;
+  flex-direction: column;
+  
+
+}
+.form-element{
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  width: 90%;
+}
+.form-group {
+  margin-bottom: 20px;
+  width: 42%;
+}
+
+  .example-url {
+    font-size: 12px;
+    color: gray;
+    width: 92%;
+  }
+  
+
+.form-group label {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #172B4D;
+}
+
+.form-group label .required {
+  color: #DE350B;
+  margin-left: 4px;
+}
+
+.form-control {
+  width: 100%;
+  padding: 8px 12px;
+  font-size: 14px;
+  border: 2px solid #DFE1E6;
+  border-radius: 3px;
+  transition: border-color 0.2s;
+}
+
+.form-control:focus {
+  outline: none;
+  border-color: #4C9AFF;
+  box-shadow: 0 0 0 2px rgba(76, 154, 255, 0.3);
+}
+
+.form-control.error {
+  border-color: #DE350B;
+}
+
+
+.form-actions {
+  margin-top: 24px;
+  width: 98%;
+  display: flex;
+  justify-content: space-between;
+}
+
+/* For when the form is showing validation errors */
+.error-message {
+  color: #DE350B;
+  font-size: 12px;
+  margin-top: 4px;
+}
+
+.delete-section {
+  margin-bottom: 5px;
+  width: 90%;
+}
+
+  /* Styling for AccountTable Component */
+
+.account-table-container {
+  margin-top: 20px;
+  padding: 10px;
+  border-radius: 8px;
+  border: 1px solid #ccc;
+  background-color: #f9f9f9;
+  overflow-x: auto;
+}
+
+.account-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.account-table th,
+.account-table td {
+  border: 1px solid #ddd;
+  padding: 10px;
+  text-align: left;
+}
+
+.account-table th {
+  background-color: #007bff;
+  color: white;
+  font-weight: bold;
+}
+
+.account-table tr:nth-child(even) {
+  background-color: #f2f2f2;
+}
+
+.account-table tr:hover {
+  background-color: #e6f7ff;
+}
+
+.no-accounts {
+  text-align: center;
+  font-weight: bold;
+  color: red;
+  margin-top: 20px;
+}
