@@ -233,11 +233,9 @@ button:active {
   background-color: white;
   z-index: 400;
   padding: 20px;
-
   border-radius: 3px;
   max-height: 75vh;
   width: 478px;
-
   overflow-y: auto;
   box-shadow: 0 8px 16px rgba(9, 30, 66, 0.25), 0 0 1px rgba(9, 30, 66, 0.31);
   display: flex;
@@ -269,9 +267,8 @@ button:active {
 form{
   display: flex;
   flex-direction: column;
-  
-
 }
+
 .form-element{
   display: flex;
   flex-direction: row;
@@ -342,6 +339,10 @@ form{
 .delete-section {
   margin-bottom: 5px;
   width: 90%;
+}
+
+.InvalidCredentials {
+  color: red;
 }
 
   /* Styling for AccountTable Component */

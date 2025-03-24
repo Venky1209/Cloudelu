@@ -1,0 +1,271 @@
+/* Filter.css */
+.filter-container {
+  padding: 20px;
+  font-family: Arial, sans-serif;
+}
+
+.account-details {
+  background-color: #f5f5f5;
+  padding: 15px;
+  border-radius: 4px;
+  margin-bottom: 20px;
+}
+
+.detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 15px;
+}
+
+.detail-item {
+  display: flex;
+  flex-direction: column;
+}
+
+.detail-label {
+  font-weight: bold;
+  margin-bottom: 5px;
+  color: #555;
+}
+
+.detail-value {
+  font-family: monospace;
+  background-color: #eee;
+  padding: 5px;
+  border-radius: 3px;
+  overflow-wrap: break-word;
+}
+
+.loading {
+  padding: 20px;
+  text-align: center;
+  background-color: #f0f8ff;
+  border-radius: 4px;
+  margin-bottom: 20px;
+}
+
+.error-panel {
+  background-color: #fff0f0;
+  border: 1px solid #ffcccb;
+  padding: 15px;
+  border-radius: 4px;
+  margin-bottom: 20px;
+}
+
+.troubleshooting {
+  margin-top: 15px;
+}
+
+.filter-input {
+  margin-top: 8px;
+}
+
+.filter-input input {
+  width: 90%;
+  padding: 6px;
+  border: 1px solid #ddd;
+  border-radius: 3px;
+  font-size: 12px;
+}
+
+.account-select-table {
+  width: 90%;
+  padding: 6px;
+  border-radius: 4px;
+  border: 1px solid #ccc;
+  font-size: 12px;
+}
+
+.data-table-container {
+  margin-top: 20px;
+}
+
+.table-wrapper {
+  overflow-x: auto;
+  max-width: 100%;
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 14px;
+  table-layout: fixed;
+}
+
+.data-table th, .data-table td {
+  border: 1px solid #ddd;
+  padding: 12px;
+  text-align: left;
+  width: 150px;
+  min-width: 150px;
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.data-table th {
+  background-color: #f2f2f2;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  vertical-align: top;
+  height: 70px;
+}
+
+.data-table tbody tr:nth-child(even) {
+  background-color: #f9f9f9;
+}
+
+.data-table tbody tr:hover {
+  background-color: #f0f0f0;
+}
+
+.cost-cell {
+  text-align: right;
+  font-family: monospace;
+}
+
+.number-cell {
+  text-align: right;
+  font-family: monospace;
+}
+
+.loading-cell, .error-cell, .empty-cell {
+  text-align: center;
+  padding: 20px !important;
+  color: #666;
+}
+
+.loading-cell {
+  background-color: #f0f8ff;
+}
+
+.error-cell {
+  background-color: #fff0f0;
+}
+
+.empty-cell {
+  background-color: #f9f9f9;
+}
+
+/* Add tooltip-like behavior for overflow text */
+.data-table td:hover {
+  white-space: normal;
+  overflow: visible;
+  position: relative;
+  z-index: 1;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+  background-color: #fff;
+}
+
+/* Updated visualization container for single row layout */
+.visualizations-container {
+  display: flex;
+  width: 100%;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+/* Remove box styling from visualization sections */
+.visualization-section {
+  flex: 1;
+  padding: 0;
+  margin: 0;
+  width: 33.33%;
+  min-width: 250px;
+  box-shadow: none;
+  background: none;
+  border-radius: 0;
+}
+
+.visualization-section h3 {
+  margin-top: 0;
+  margin-bottom: 10px;
+  font-size: 16px;
+  text-align: center;
+}
+
+.chart-scroll-container {
+  width: 100%;
+  overflow-x: hidden;
+  padding: 0;
+}
+
+.pie-chart-container,
+.line-chart-container {
+  width: 100%;
+  height: 300px;
+  position: relative;
+  margin: 0;
+}
+
+.loading-viz, .empty-viz {
+  height: 300px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  color: #666;
+  background-color: #f9f9f9;
+  border-radius: 4px;
+}
+
+.total-cost {
+  text-align: center;
+  font-weight: bold;
+  margin-top: 5px;
+  font-size: 14px;
+}
+
+/* Media query for responsive layout */
+@media (max-width: 1100px) {
+  .visualizations-container {
+    flex-wrap: wrap;
+  }
+  
+  .visualization-section {
+    width: 100%;
+    flex-basis: 100%;
+    margin-bottom: 20px;
+  }
+}
+
+/* Custom styling for date labels */
+.recharts-xaxis .recharts-cartesian-axis-tick text {
+  font-size: 10px;
+}
+
+/* Legend styling */
+.sunday-point-legend,
+.trend-point-legend {
+  display: flex;
+  align-items: center;
+  margin-right: 15px;
+  font-size: 12px;
+}
+
+.sunday-point-marker,
+.trend-point-marker {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  margin-right: 5px;
+}
+
+.sunday-point-marker {
+  background-color: #ff7300;
+}
+
+.trend-point-marker {
+  background-color: #82ca9d;
+}
+
+.chart-legend-container {
+  display: flex;
+  justify-content: center;
+  margin-top: 5px;
+  padding: 3px;
+  font-size: 12px;
+}
