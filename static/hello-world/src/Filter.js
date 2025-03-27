@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import AWS from "aws-sdk";
+
 import {
   PieChart,
   Pie,
@@ -38,6 +39,10 @@ const Filter = ({ accounts }) => {
     usageAmount: "",
   });
 
+  useEffect(()=>{
+    console.log(filters)
+  },[filters])
+
   const handleSelectChange = (e) => {
     const selectedName = e.target.value;
     const account = accounts.find((acc) => acc.targetName === selectedName);
@@ -48,89 +53,113 @@ const Filter = ({ accounts }) => {
 
   const handleFilterChange = (e) => {
     const { name, value } = e.target;
-    setFilters((prev) => ({ ...prev, [name]: value }));
-  };
+    
+    // const [year, month, day] = value.split("-");
+    // const formattedDate = ${month}-${day}-${year};
 
-  const filteredResults = queryResults.filter((row) => {
-    const accountMatch =
-      row.account?.toLowerCase().includes(filters.account.toLowerCase()) ||
-      !filters.account;
+    // console.log(Filter updated: ${name} = ${formattedDate});
 
-    let productMatch = true;
-    if (filters.productName && row.productName) {
-      try {
-        if (typeof row.productName === "string") {
-          const productObj = JSON.parse(row.productName);
-          productMatch =
-            productObj.product_name
-              ?.toLowerCase()
-              .includes(filters.productName.toLowerCase()) || false;
-        } else if (typeof row.productName === "object") {
-          productMatch =
-            row.productName.product_name
-              ?.toLowerCase()
-              .includes(filters.productName.toLowerCase()) || false;
-        }
-      } catch (e) {
-        productMatch = false;
-      }
+    setFilters((prev) => ({ ...prev, [name]: value})); // Store as YYYY-MM-DD
+};
+
+
+const filteredResults = queryResults.filter((row) => {
+  const rowStartDate = row.startDate ? new Date(row.startDate) : null;
+  const rowEndDate = row.endDate ? new Date(row.endDate) : null;
+
+  const filterStartDate = filters.startDate ? new Date(filters.startDate) : null;
+  const filterEndDate = filters.endDate ? new Date(filters.endDate) : null;
+
+  // ✅ Date matching logic (inclusive of start and end dates)
+  let dateMatch = true;
+
+if (filterStartDate && filterEndDate) {
+  // Both start and end date are set
+  dateMatch =
+    (rowStartDate && rowEndDate) &&
+    (rowStartDate >= filterStartDate && rowEndDate <= filterEndDate); 
+} else if (filterStartDate && !filterEndDate) {
+  // Only start date is set, so check if the row's start or end date is after it
+  dateMatch =
+    (rowStartDate && rowStartDate >= filterStartDate) ||
+    (rowEndDate && rowEndDate >= filterStartDate);
+} else if (filterEndDate && !filterStartDate) {
+  // Only end date is set, so check if the row's start or end date is before it
+  dateMatch =
+    (rowStartDate && rowStartDate <= filterEndDate) ||
+    (rowEndDate && rowEndDate <= filterEndDate);
+}
+
+  // Other filters
+  const accountMatch =
+  row.account?.toLowerCase().includes(filters.account.toLowerCase()) ||
+  !filters.account;
+
+let productMatch = true;
+if (filters.productName && row.productName) {
+  try {
+    if (typeof row.productName === "string") {
+      const productObj = JSON.parse(row.productName);
+      productMatch =
+        productObj.product_name
+          ?.toLowerCase()
+          .includes(filters.productName.toLowerCase()) || false;
+    } else if (typeof row.productName === "object") {
+      productMatch =
+        row.productName.product_name
+          ?.toLowerCase()
+          .includes(filters.productName.toLowerCase()) || false;
     }
+  } catch (e) {
+    productMatch = false;
+  }
+}
 
-    const productFamilyMatch =
-      row.productFamily
-        ?.toLowerCase()
-        .includes(filters.productFamily.toLowerCase()) ||
-      !filters.productFamily;
+const productFamilyMatch =
+  row.productFamily
+    ?.toLowerCase()
+    .includes(filters.productFamily.toLowerCase()) ||
+  !filters.productFamily;
 
-    const regionMatch =
-      row.region?.toLowerCase().includes(filters.region.toLowerCase()) ||
-      !filters.region;
+const regionMatch =
+  row.region?.toLowerCase().includes(filters.region.toLowerCase()) ||
+  !filters.region;
 
-    const resourceIdMatch =
-      row.resourceId
-        ?.toLowerCase()
-        .includes(filters.resourceId.toLowerCase()) || !filters.resourceId;
+const resourceIdMatch =
+  row.resourceId
+    ?.toLowerCase()
+    .includes(filters.resourceId.toLowerCase()) || !filters.resourceId;
 
-    const operationMatch =
-      row.operation?.toLowerCase().includes(filters.operation.toLowerCase()) ||
-      !filters.operation;
+const operationMatch =
+  row.operation?.toLowerCase().includes(filters.operation.toLowerCase()) ||
+  !filters.operation;
 
-    // Filter by cost
-    const costMatch =
-      !filters.effectiveCost ||
-      (row.effectiveCost &&
-        row.effectiveCost.toString().includes(filters.effectiveCost));
+// Filter by cost
+const costMatch =
+  !filters.effectiveCost ||
+  (row.effectiveCost &&
+    row.effectiveCost.toString().includes(filters.effectiveCost));
 
-    // Filter by dates
-    const startDateMatch =
-      !filters.startDate ||
-      (row.startDate &&
-        row.startDate.toLowerCase().includes(filters.startDate.toLowerCase()));
+  // Filter by usage amount
+  const usageMatch =
+  !filters.usageAmount ||
+  (row.usageAmount &&
+    row.usageAmount.toString().includes(filters.usageAmount));
+  // Apply all filter conditions
+  return (
+    dateMatch &&
+    accountMatch &&
+    productMatch &&
+    productFamilyMatch &&
+    regionMatch &&
+    resourceIdMatch &&
+    operationMatch &&
+    costMatch &&
+    usageMatch
+  );
+});
 
-    const endDateMatch =
-      !filters.endDate ||
-      (row.endDate &&
-        row.endDate.toLowerCase().includes(filters.endDate.toLowerCase()));
 
-    // Filter by usage amount
-    const usageMatch =
-      !filters.usageAmount ||
-      (row.usageAmount &&
-        row.usageAmount.toString().includes(filters.usageAmount));
-
-    return (
-      accountMatch &&
-      productMatch &&
-      productFamilyMatch &&
-      regionMatch &&
-      resourceIdMatch &&
-      operationMatch &&
-      costMatch &&
-      startDateMatch &&
-      endDateMatch &&
-      usageMatch
-    );
-  });
 
   useEffect(() => {
     if (!selectedAccount) return;
@@ -313,7 +342,7 @@ const Filter = ({ accounts }) => {
   const formatCost = (cost) => {
     if (cost === null || cost === undefined) return "$0.00";
     const numCost = typeof cost === "string" ? parseFloat(cost) : cost;
-    return !isNaN(numCost) ? `$${numCost.toFixed(4)}` : "$0.00";
+    return !isNaN(numCost) ? `$${numCost.toFixed(4)}`: "$0.00";
   };
 
   const formatDate = (dateStr) => {
@@ -637,17 +666,32 @@ const Filter = ({ accounts }) => {
                   >
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis
-                      dataKey="date"
-                      tick={{ fontSize: 10 }}
-                      angle={-45}
-                      textAnchor="end"
-                      height={60}
-                    />
+  dataKey="date"
+  tickFormatter={(dateStr) => {
+    if (!dateStr) return ""; // Prevents undefined issues
+
+    // Parse date properly
+    const dateObj = new Date(dateStr);
+    if (isNaN(dateObj.getTime())) return dateStr; // Return original if invalid
+
+    const day = String(dateObj.getDate()).padStart(2, "0"); // Add leading zero
+    const month = String(dateObj.getMonth() + 1).padStart(2, "0"); // Add leading zero
+
+    return `${day}/${month}`;
+  }}
+  tick={{ fontSize: 10 }}
+  angle={-45}
+  textAnchor="end"
+  height={60}
+/>
+
+
+
                     <YAxis />
                     <Tooltip
                       formatter={(value, name) => {
                         if (name === "Sunday Cost") return [`$${value}`, name];
-                        if (name === "Trend") return [`$${value}`, name];
+                        if (name === "Trend") return [  `$${value}`, name];
                         return [value, name];
                       }}
                     />
@@ -826,6 +870,7 @@ const Filter = ({ accounts }) => {
       )}
 
       {/* Data Table */}
+      
       <div className="data-table-container">
         <h3>
           AWS Cost Data{" "}
@@ -833,195 +878,195 @@ const Filter = ({ accounts }) => {
         </h3>
         <div className="table-wrapper">
           <table className="data-table">
-            <thead>
-              <tr>
-                <th>
-                  ID
-                  <div className="filter-input">
-                    <input
-                      id="account"
-                      name="account"
-                      type="text"
-                      value={filters.account}
-                      onChange={handleFilterChange}
-                      placeholder="Filter by ID"
-                    />
-                  </div>
-                </th>
-                <th>
-                  Product
-                  <div className="filter-input">
-                    <input
-                      id="productName"
-                      name="productName"
-                      type="text"
-                      value={filters.productName}
-                      onChange={handleFilterChange}
-                      placeholder="Filter by product"
-                    />
-                  </div>
-                </th>
-                <th>
-                  Family
-                  <div className="filter-input">
-                    <input
-                      id="productFamily"
-                      name="productFamily"
-                      type="text"
-                      value={filters.productFamily || ""}
-                      onChange={handleFilterChange}
-                      placeholder="Filter by family"
-                    />
-                  </div>
-                </th>
-                <th>
-                  Region
-                  <div className="filter-input">
-                    <input
-                      id="region"
-                      name="region"
-                      type="text"
-                      value={filters.region}
-                      onChange={handleFilterChange}
-                      placeholder="Filter by region"
-                    />
-                  </div>
-                </th>
-                <th>
-                  Resource ID
-                  <div className="filter-input">
-                    <input
-                      id="resourceId"
-                      name="resourceId"
-                      type="text"
-                      value={filters.resourceId}
-                      onChange={handleFilterChange}
-                      placeholder="Filter by resource ID"
-                    />
-                  </div>
-                </th>
-                <th>
-                  Operation
-                  <div className="filter-input">
-                    <input
-                      id="operation"
-                      name="operation"
-                      type="text"
-                      value={filters.operation}
-                      onChange={handleFilterChange}
-                      placeholder="Filter by operation"
-                    />
-                  </div>
-                </th>
-                <th>
-                  Cost
-                  <div className="filter-input">
-                    <input
-                      id="effectiveCost"
-                      name="effectiveCost"
-                      type="text"
-                      value={filters.effectiveCost || ""}
-                      onChange={handleFilterChange}
-                      placeholder="Filter by cost"
-                    />
-                  </div>
-                </th>
-                <th>
-                  Start Date
-                  <div className="filter-input">
-                    <input
-                      id="startDate"
-                      name="startDate"
-                      type="text"
-                      value={filters.startDate || ""}
-                      onChange={handleFilterChange}
-                      placeholder="Filter by start date"
-                    />
-                  </div>
-                </th>
-                <th>
-                  End Date
-                  <div className="filter-input">
-                    <input
-                      id="endDate"
-                      name="endDate"
-                      type="text"
-                      value={filters.endDate || ""}
-                      onChange={handleFilterChange}
-                      placeholder="Filter by end date"
-                    />
-                  </div>
-                </th>
-                <th>
-                  Usage
-                  <div className="filter-input">
-                    <input
-                      id="usageAmount"
-                      name="usageAmount"
-                      type="text"
-                      value={filters.usageAmount || ""}
-                      onChange={handleFilterChange}
-                      placeholder="Filter by usage"
-                    />
-                  </div>
-                </th>
-                <th>
-                  Account
-                  <div className="filter-input">
-                    <select
-                      onChange={handleSelectChange}
-                      value={selectedAccount?.targetName || ""}
-                      className="account-select-table"
-                    >
-                      {accounts.map((acc, index) => (
-                        <option key={index} value={acc.targetName}>
-                          {acc.targetName}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </th>
-              </tr>
-            </thead>
+          <thead>
+  <tr>
+    <th>
+      Account
+      <div className="filter-input">
+        <select
+          onChange={handleSelectChange}
+          value={selectedAccount?.targetName || ""}
+          className="account-select-table"
+        >
+          {accounts.map((acc, index) => (
+            <option key={index} value={acc.targetName}>
+              {acc.targetName}
+            </option>
+          ))}
+        </select>
+      </div>
+    </th>
+    <th>
+      ID
+      <div className="filter-input">
+        <input
+          id="account"
+          name="account"
+          type="text"
+          value={filters.account}
+          onChange={handleFilterChange}
+          placeholder="Filter by ID"
+        />
+      </div>
+    </th>
+    <th>
+      Product
+      <div className="filter-input">
+        <input
+          id="productName"
+          name="productName"
+          type="text"
+          value={filters.productName}
+          onChange={handleFilterChange}
+          placeholder="Filter by product"
+        />
+      </div>
+    </th>
+    <th>
+      Family
+      <div className="filter-input">
+        <input
+          id="productFamily"
+          name="productFamily"
+          type="text"
+          value={filters.productFamily || ""}
+          onChange={handleFilterChange}
+          placeholder="Filter by family"
+        />
+      </div>
+    </th>
+    <th>
+      Region
+      <div className="filter-input">
+        <input
+          id="region"
+          name="region"
+          type="text"
+          value={filters.region}
+          onChange={handleFilterChange}
+          placeholder="Filter by region"
+        />
+      </div>
+    </th>
+    <th>
+      Resource ID
+      <div className="filter-input">
+        <input
+          id="resourceId"
+          name="resourceId"
+          type="text"
+          value={filters.resourceId}
+          onChange={handleFilterChange}
+          placeholder="Filter by resource ID"
+        />
+      </div>
+    </th>
+    <th>
+      Operation
+      <div className="filter-input">
+        <input
+          id="operation"
+          name="operation"
+          type="text"
+          value={filters.operation}
+          onChange={handleFilterChange}
+          placeholder="Filter by operation"
+        />
+      </div>
+    </th>
+    <th>
+      Cost
+      <div className="filter-input">
+        <input
+          id="effectiveCost"
+          name="effectiveCost"
+          type="text"
+          value={filters.effectiveCost || ""}
+          onChange={handleFilterChange}
+          placeholder="Filter by cost"
+        />
+      </div>
+    </th>
+    <th>
+      Start Date
+      <div className="filter-input">
+        <input
+          id="startDate"
+          name="startDate"
+          type="date"
+          value={filters.startDate || ""}
+          onChange={handleFilterChange}
+          placeholder="Select Start Date"
+        />
+      </div>
+    </th>
+    <th>
+      End Date
+      <div className="filter-input">
+        <input
+          id="endDate"
+          name="endDate"
+          type="date"
+          value={filters.endDate || ""}
+           min={filters.startDate ? new Date(new Date(filters.startDate).getTime() + 86400000).toISOString().split("T")[0] : ""}
+          onChange={handleFilterChange}
+          placeholder="Select End Date"
+        />
+      </div>
+    </th>
+    <th>
+      Usage
+      <div className="filter-input">
+        <input
+          id="usageAmount"
+          name="usageAmount"
+          type="text"
+          value={filters.usageAmount || ""}
+          onChange={handleFilterChange}
+          placeholder="Filter by usage"
+        />
+      </div>
+    </th>
+  </tr>
+</thead>
+
+
             <tbody>
-              {isLoading ? (
-                <tr>
-                  <td colSpan="11" className="loading-cell">
-                    Loading data...
-                  </td>
-                </tr>
-              ) : error ? (
-                <tr>
-                  <td colSpan="11" className="error-cell">
-                    Error loading data
-                  </td>
-                </tr>
-              ) : filteredResults.length === 0 ? (
-                <tr>
-                  <td colSpan="11" className="empty-cell">
-                    No data available
-                  </td>
-                </tr>
-              ) : (
-                filteredResults.map((row, index) => (
-                  <tr key={index}>
-                    <td>{row.account || "N/A"}</td>
-                    <td>{getProductName(row.productName)}</td>
-                    <td>{row.productFamily || "N/A"}</td>
-                    <td>{row.region || "N/A"}</td>
-                    <td>{row.resourceId || "N/A"}</td>
-                    <td>{row.operation || "N/A"}</td>
-                    <td className="cost-cell">
-                      {formatCost(row.effectiveCost)}
-                    </td>
-                    <td>{formatDate(row.startDate)}</td>
-                    <td>{formatDate(row.endDate)}</td>
-                    <td className="number-cell">{row.usageAmount || "0"}</td>
-                    <td>{selectedAccount.targetName}</td>
-                  </tr>
-                ))
-              )}
-            </tbody>
+  {isLoading ? (
+    <tr>
+      <td colSpan="11" className="loading-cell">Loading data...</td>
+    </tr>
+  ) : error ? (
+    <tr>
+      <td colSpan="11" className="error-cell">Error loading data</td>
+    </tr>
+  ) : filteredResults.length === 0 ? (
+    <tr>
+      <td colSpan="11" className="empty-cell">No data available</td>
+    </tr>
+  ) : (
+    filteredResults.map((row, index) => (
+      <tr key={index}>
+        <td>{selectedAccount.targetName}</td>
+        <td>{row.account || "N/A"}</td>
+        <td>{getProductName(row.productName)}</td>
+        <td>{row.productFamily || "N/A"}</td>
+        <td>{row.region || "N/A"}</td>
+        <td>{row.resourceId || "N/A"}</td>
+        <td>{row.operation || "N/A"}</td>
+        <td className="cost-cell">{formatCost(row.effectiveCost)}</td>
+
+        <td>{row.startDate ? formatDate(row.startDate) : "N/A"}</td>
+        <td>{row.endDate ? formatDate(row.endDate) : "N/A"}</td>
+
+        <td className="number-cell">{row.usageAmount || "0"}</td>
+      </tr>
+    ))
+  )}
+</tbody>
+
+
+
           </table>
         </div>
       </div>
