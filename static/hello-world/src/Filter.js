@@ -67,28 +67,32 @@ const filteredResults = queryResults.filter((row) => {
   const rowStartDate = row.startDate ? new Date(row.startDate) : null;
   const rowEndDate = row.endDate ? new Date(row.endDate) : null;
 
-  const filterStartDate = filters.startDate ? new Date(filters.startDate) : null;
-  const filterEndDate = filters.endDate ? new Date(filters.endDate) : null;
+  let filterStartDate = filters.startDate ? new Date(filters.startDate) : null;
+  let filterEndDate = filters.endDate ? new Date(filters.endDate) : null;
 
-  // ✅ Date matching logic (inclusive of start and end dates)
+  // ✅ Normalize times to prevent timezone shift issues
+  if (filterStartDate) filterStartDate.setHours(0, 0, 0, 0); // Start of the day
+  if (filterEndDate) filterEndDate.setHours(23, 59, 59, 999); // End of the day
+
+  if (rowStartDate) rowStartDate.setHours(0, 0, 0, 0);
+  if (rowEndDate) rowEndDate.setHours(23, 59, 59, 999);
+
+  // ✅ Date filtering logic (inclusive of start & end date)
   let dateMatch = true;
 
-if (filterStartDate && filterEndDate) {
-  // Both start and end date are set
-  dateMatch =
-    (rowStartDate && rowEndDate) &&
-    (rowStartDate >= filterStartDate && rowEndDate <= filterEndDate); 
-} else if (filterStartDate && !filterEndDate) {
-  // Only start date is set, so check if the row's start or end date is after it
-  dateMatch =
-    (rowStartDate && rowStartDate >= filterStartDate) ||
-    (rowEndDate && rowEndDate >= filterStartDate);
-} else if (filterEndDate && !filterStartDate) {
-  // Only end date is set, so check if the row's start or end date is before it
-  dateMatch =
-    (rowStartDate && rowStartDate <= filterEndDate) ||
-    (rowEndDate && rowEndDate <= filterEndDate);
-}
+  if (filterStartDate && filterEndDate) {
+    dateMatch =
+      (rowStartDate && rowStartDate >= filterStartDate && rowStartDate <= filterEndDate) ||
+      (rowEndDate && rowEndDate >= filterStartDate && rowEndDate <= filterEndDate);
+  } else if (filterStartDate) {
+    dateMatch =
+      (rowStartDate && rowStartDate >= filterStartDate) ||
+      (rowEndDate && rowEndDate >= filterStartDate);
+  } else if (filterEndDate) {
+    dateMatch =
+      (rowStartDate && rowStartDate <= filterEndDate) ||
+      (rowEndDate && rowEndDate <= filterEndDate);
+  }
 
   // Other filters
   const accountMatch =
@@ -212,7 +216,7 @@ const costMatch =
 
           if (queryStatus === "FAILED" || queryStatus === "CANCELLED") {
             const errorReason =
-              statusResponse.QueryExecution.Status.StateChangeReason;
+            statusResponse.QueryExecution.Status.StateChangeReason;
             console.error("Query failed with reason:", errorReason);
             throw new Error(`Query execution failed: ${errorReason}`);
           }
@@ -299,7 +303,7 @@ const costMatch =
           line_item_usage_end_date as endDate,
           line_item_usage_amount as usageAmount
         FROM ${databaseName}.${tableName}
-        LIMIT 100;`;
+        ;`;
 
         const fetchDataExecution = await executeAthenaQuery(fetchDataQuery);
         console.log(
